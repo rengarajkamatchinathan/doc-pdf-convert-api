@@ -1,0 +1,3 @@
+fastapi
+uvicorn[standard]
+pypandoc  # Or any library you use
