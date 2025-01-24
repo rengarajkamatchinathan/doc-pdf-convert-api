@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 import pypandoc
 import tempfile
 import os
+import shutil
 
 app = FastAPI()
 
@@ -21,10 +22,10 @@ async def convert_docx_to_pdf(file: UploadFile = File(...)):
 
         # Convert to PDF using pypandoc
         try:
-            output_file = temp_file_path.replace(".docx", ".pdf")
+            output_file = os.path.join(temp_dir, file.filename.replace(".docx", ".pdf"))
             pypandoc.convert_file(temp_file_path, 'pdf', outputfile=output_file)
 
             # Return the PDF file as a response
-            return FileResponse(output_file, media_type="application/pdf", filename=f"{file.filename.replace('.docx', '.pdf')}")
+            return FileResponse(output_file, media_type="application/pdf", filename=file.filename.replace(".docx", ".pdf"))
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
