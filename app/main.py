@@ -1,34 +1,46 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse
-import pypandoc
+from fastapi import FastAPI, UploadFile, File, HTTPException
+import subprocess
 import tempfile
 import os
-import shutil
+from io import BytesIO
+from fastapi.responses import StreamingResponse
 
 app = FastAPI()
 
 @app.post("/convert/")
 async def convert_docx_to_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith(".docx"):
-        raise HTTPException(status_code=400, detail="Only .docx files are supported")
-
-    # Create a temporary directory for conversion
-    temp_dir = tempfile.mkdtemp()
-    temp_file_path = os.path.join(temp_dir, file.filename)
-
-    # Save the uploaded file temporarily
     try:
-        with open(temp_file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+        # Create a temporary file to store the uploaded .docx
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
+            content = await file.read()
+            tmp_docx.write(content)
+            tmp_docx.close()
 
-        # Convert to PDF using pypandoc
-        output_file = os.path.join(temp_dir, file.filename.replace(".docx", ".pdf"))
-        pypandoc.convert_file(temp_file_path, 'pdf', outputfile=output_file)
+            # Generate the output PDF path
+            tmp_pdf = tmp_docx.name.replace(".docx", ".pdf")
 
-        # Return the PDF file as a response
-        return FileResponse(output_file, media_type="application/pdf", filename=file.filename.replace(".docx", ".pdf"))
+            # Use Pandoc to convert .docx to PDF using LaTeX
+            result = subprocess.run(
+                ["pandoc", tmp_docx.name, "-o", tmp_pdf, "--pdf-engine=xelatex"],
+                capture_output=True,
+                text=True
+            )
+
+            # Check for errors in the Pandoc conversion
+            if result.returncode != 0:
+                raise HTTPException(status_code=500, detail=f"Pandoc conversion failed: {result.stderr}")
+
+            # Open the generated PDF file
+            with open(tmp_pdf, "rb") as f:
+                pdf_content = f.read()
+
+            # Clean up temporary files
+            os.remove(tmp_docx.name)
+            os.remove(tmp_pdf)
+
+            # Return the PDF as a streaming response
+            return StreamingResponse(BytesIO(pdf_content), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=converted.pdf"})
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-    finally:
-        # Cleanup the temporary directory after sending the response
-        shutil.rmtree(temp_dir)
+        # Handle unexpected errors
+        return {"error": str(e)}

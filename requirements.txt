@@ -1,4 +1,3 @@
-fastapi
-uvicorn[standard]
-pypandoc  # Or any library you use
-python-multipart
+fastapi==0.88.0
+uvicorn==0.18.0
+python-dotenv==0.20.0

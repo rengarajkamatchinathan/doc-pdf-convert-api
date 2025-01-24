@@ -1,26 +1,26 @@
-# Use an official Python image
-FROM python:3.10-slim
+# Use a Python base image
+FROM python:3.9-slim
 
-# Set the working directory
-WORKDIR /app
-
-# Copy the project files to the container
-COPY . .
-
-# Install system dependencies
+# Install system dependencies (Pandoc, LaTeX)
 RUN apt-get update && apt-get install -y \
-    libreoffice \
-    && apt-get clean
+    pandoc \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    texlive-latex-extra \
+    --no-install-recommends && \
+    apt-get clean
 
 # Install Python dependencies
+WORKDIR /app
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Install pandoc
-RUN apt-get update && apt-get install -y pandoc
-RUN apt-get update && apt-get install -y texlive-full
 
+# Copy your FastAPI app into the container
+COPY . /app
 
-# Expose port 8000
+# Expose the necessary port (e.g., 8000 for FastAPI)
 EXPOSE 8000
 
-# Start the application using Uvicorn
+# Command to run the FastAPI app with Uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
